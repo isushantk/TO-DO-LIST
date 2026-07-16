@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow — Advanced To-Do</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+  <!-- Toast Container -->
+  <div id="toast-container" aria-live="polite"></div>
+
+  <!-- Confetti Canvas -->
+  <canvas id="confetti-canvas" aria-hidden="true"></canvas>
+
+  <!-- Sidebar Overlay (mobile) -->
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <!-- ====== AUTH SCREEN ====== -->
+  <div class="auth-screen" id="auth-screen">
+    <div class="auth-card glass-card">
+
+      <div class="auth-logo">
+        <span class="auth-logo-icon" aria-hidden="true">✦</span>
+        <span class="auth-logo-text">TaskFlow</span>
+      </div>
+      <p class="auth-tagline">Your personal productivity hub</p>
+
+      <!-- Tab switcher -->
+      <div class="auth-tabs" role="tablist">
+        <button class="auth-tab active" data-tab="login" role="tab" aria-selected="true">Sign In</button>
+        <button class="auth-tab" data-tab="register" role="tab" aria-selected="false">Register</button>
+      </div>
+
+      <!-- Login Form -->
+      <form class="auth-form" id="login-form" novalidate>
+        <div class="form-group">
+          <label for="login-username">Username</label>
+          <input type="text" id="login-username" class="form-input" placeholder="Enter your username"
+                 autocomplete="username" spellcheck="false" />
+        </div>
+        <div class="form-group">
+          <label for="login-password">Password</label>
+          <div class="pw-wrap">
+            <input type="password" id="login-password" class="form-input" placeholder="Enter your password"
+                   autocomplete="current-password" />
+            <button type="button" class="pw-toggle" data-target="login-password" aria-label="Toggle visibility">👁</button>
+          </div>
+        </div>
+        <p class="auth-error" id="login-error" role="alert"></p>
+        <button type="submit" class="btn-primary auth-submit">Sign In</button>
+        <p class="auth-hint">Demo: register a new account to get started.</p>
+      </form>
+
+      <!-- Register Form -->
+      <form class="auth-form" id="register-form" novalidate style="display:none">
+        <div class="form-group">
+          <label for="reg-username">Username</label>
+          <input type="text" id="reg-username" class="form-input" placeholder="Choose a username (min. 3 chars)"
+                 autocomplete="username" spellcheck="false" />
+        </div>
+        <div class="form-group">
+          <label for="reg-password">Password</label>
+          <div class="pw-wrap">
+            <input type="password" id="reg-password" class="form-input" placeholder="Choose a password (min. 6 chars)"
+                   autocomplete="new-password" />
+            <button type="button" class="pw-toggle" data-target="reg-password" aria-label="Toggle visibility">👁</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="reg-confirm">Confirm Password</label>
+          <div class="pw-wrap">
+            <input type="password" id="reg-confirm" class="form-input" placeholder="Repeat your password"
+                   autocomplete="new-password" />
+            <button type="button" class="pw-toggle" data-target="reg-confirm" aria-label="Toggle visibility">👁</button>
+          </div>
+        </div>
+        <p class="auth-error" id="register-error" role="alert"></p>
+        <button type="submit" class="btn-primary auth-submit">Create Account</button>
+      </form>
+
+    </div>
+  </div>
+
+  <div class="app-wrapper" id="app-wrapper" style="display:none">
+
+    <!-- ====== SIDEBAR ====== -->
+    <aside class="sidebar" id="sidebar" aria-label="Navigation">
+
+      <div class="sidebar-header">
+        <div class="logo">
+          <span class="logo-icon" aria-hidden="true">✦</span>
+          <span class="logo-text">TaskFlow</span>
+        </div>
+        <button class="theme-toggle" id="theme-toggle" title="Toggle theme" aria-label="Toggle dark/light mode">
+          <span class="theme-icon">🌙</span>
+        </button>
+      </div>
+
+      <!-- User Badge -->
+      <div class="user-badge glass-card">
+        <div class="user-avatar" id="user-avatar" aria-hidden="true">U</div>
+        <div class="user-info-text">
+          <span class="user-name" id="user-name">Username</span>
+          <span class="user-sub">Signed in</span>
+        </div>
+        <button class="btn-logout" id="btn-logout" title="Sign out" aria-label="Sign out">⏻</button>
+      </div>
+
+      <!-- Stats Panel -->
+      <div class="stats-panel glass-card">
+        <div class="progress-ring-container" title="Today's completion">
+          <svg class="progress-ring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ring-track" cx="60" cy="60" r="50"/>
+            <circle class="ring-fill" id="progress-ring-fill" cx="60" cy="60" r="50"/>
+          </svg>
+          <div class="ring-label">
+            <span id="completion-pct">0%</span>
+            <small>Today</small>
+          </div>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-num" id="stat-total">0</span>
+            <span class="stat-label">Total</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-done">0</span>
+            <span class="stat-label">Done</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-pending">0</span>
+            <span class="stat-label">Pending</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-num" id="stat-streak">🔥 0</span>
+            <span class="stat-label">Streak</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Categories -->
+      <nav class="categories" aria-label="Task categories">
+        <h3 class="nav-title">Categories</h3>
+        <ul class="cat-list" id="cat-list" role="list">
+          <li class="cat-item active" data-cat="all" role="button" tabindex="0" aria-pressed="true">
+            <span class="cat-icon" aria-hidden="true">📋</span> All Tasks
+            <span class="cat-count" id="count-all">0</span>
+          </li>
+          <li class="cat-item" data-cat="work" role="button" tabindex="0" aria-pressed="false">
+            <span class="cat-icon" aria-hidden="true">💼</span> Work
+            <span class="cat-count" id="count-work">0</span>
+          </li>
+          <li class="cat-item" data-cat="personal" role="button" tabindex="0" aria-pressed="false">
+            <span class="cat-icon" aria-hidden="true">🏠</span> Personal
+            <span class="cat-count" id="count-personal">0</span>
+          </li>
+          <li class="cat-item" data-cat="shopping" role="button" tabindex="0" aria-pressed="false">
+            <span class="cat-icon" aria-hidden="true">🛒</span> Shopping
+            <span class="cat-count" id="count-shopping">0</span>
+          </li>
+          <li class="cat-item" data-cat="health" role="button" tabindex="0" aria-pressed="false">
+            <span class="cat-icon" aria-hidden="true">💪</span> Health
+            <span class="cat-count" id="count-health">0</span>
+          </li>
+          <li class="cat-item" data-cat="other" role="button" tabindex="0" aria-pressed="false">
+            <span class="cat-icon" aria-hidden="true">📌</span> Other
+            <span class="cat-count" id="count-other">0</span>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Export -->
+      <div class="export-section">
+        <h3 class="nav-title">Export</h3>
+        <div class="export-btns">
+          <button class="btn-export" id="export-json" title="Export tasks as JSON">📄 JSON</button>
+          <button class="btn-export" id="export-pdf" title="Print/Export as PDF">📑 PDF</button>
+        </div>
+      </div>
+
+    </aside>
+
+    <!-- ====== MAIN CONTENT ====== -->
+    <main class="main-content" id="main-content">
+
+      <!-- Top Bar -->
+      <div class="topbar">
+        <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Toggle sidebar">☰</button>
+        <div class="search-wrapper">
+          <span class="search-icon" aria-hidden="true">🔍</span>
+          <input
+            type="search"
+            id="search-input"
+            class="search-input"
+            placeholder="Search tasks..."
+            aria-label="Search tasks"
+            autocomplete="off"
+          />
+          <kbd class="kbd" aria-label="Keyboard shortcut Ctrl+F">Ctrl+F</kbd>
+        </div>
+        <div class="topbar-actions">
+          <div class="view-toggle" role="group" aria-label="Switch view">
+            <button class="view-btn active" id="view-tasks" aria-pressed="true">📋 Tasks</button>
+            <button class="view-btn" id="view-calendar" aria-pressed="false">📅 Calendar</button>
+          </div>
+          <button class="btn-primary" id="add-task-btn" aria-label="Add new task (N)">
+            <span aria-hidden="true">+</span> New Task <kbd class="kbd-sm" aria-hidden="true">N</kbd>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="filter-bar" role="toolbar" aria-label="Filter and sort tasks">
+        <div class="priority-filters" role="group" aria-label="Filter by priority">
+          <button class="filter-chip active" data-priority="all" aria-pressed="true">All</button>
+          <button class="filter-chip" data-priority="critical" aria-pressed="false">🔴 Critical</button>
+          <button class="filter-chip" data-priority="high" aria-pressed="false">🟠 High</button>
+          <button class="filter-chip" data-priority="medium" aria-pressed="false">🟡 Medium</button>
+          <button class="filter-chip" data-priority="low" aria-pressed="false">🟢 Low</button>
+        </div>
+        <div class="filter-right">
+          <label for="sort-select" class="sr-only">Sort tasks by</label>
+          <select id="sort-select" class="sort-select" aria-label="Sort tasks">
+            <option value="created">Sort: Date Created</option>
+            <option value="due">Sort: Due Date</option>
+            <option value="priority">Sort: Priority</option>
+            <option value="name">Sort: A–Z</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Task List -->
+      <div class="task-list-wrapper">
+        <div id="task-list" class="task-list" role="list" aria-label="Tasks"></div>
+        <div class="empty-state" id="empty-state" aria-hidden="true">
+          <div class="empty-icon" aria-hidden="true">✦</div>
+          <h3>No tasks here</h3>
+          <p>Press <kbd>N</kbd> to add your first task</p>
+        </div>
+      </div>
+
+      <!-- ====== CALENDAR VIEW ====== -->
+      <div class="calendar-view hidden" id="calendar-view" aria-label="Calendar view">
+        <div class="cal-header">
+          <button class="btn-cal-nav" id="cal-prev" aria-label="Previous month">&#8249;</button>
+          <h2 class="cal-month-title" id="cal-month-title">July 2026</h2>
+          <button class="btn-cal-nav" id="cal-next" aria-label="Next month">&#8250;</button>
+        </div>
+        <div class="cal-weekdays" aria-hidden="true">
+          <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span>
+          <span>Thu</span><span>Fri</span><span>Sat</span>
+        </div>
+        <div class="cal-grid" id="cal-grid" role="grid" aria-label="Calendar days"></div>
+        <div class="cal-legend" aria-label="Occupancy legend">
+          <span class="cal-legend-label">Occupancy:</span>
+          <span class="cal-legend-item"><span class="cal-legend-swatch occ-0"></span>None</span>
+          <span class="cal-legend-item"><span class="cal-legend-swatch occ-1"></span>Light (1&#8211;2)</span>
+          <span class="cal-legend-item"><span class="cal-legend-swatch occ-2"></span>Moderate (3&#8211;4)</span>
+          <span class="cal-legend-item"><span class="cal-legend-swatch occ-3"></span>Busy (5&#8211;6)</span>
+          <span class="cal-legend-item"><span class="cal-legend-swatch occ-4"></span>Very Busy (7+)</span>
+        </div>
+        <div class="cal-day-detail" id="cal-day-detail">
+          <p class="cal-detail-empty">Click a day to see its tasks.</p>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ====== ADD / EDIT TASK MODAL ====== -->
+  <div class="modal-overlay" id="task-modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal glass-card">
+      <div class="modal-header">
+        <h2 id="modal-title">New Task</h2>
+        <button class="modal-close" id="modal-close" aria-label="Close modal">✕</button>
+      </div>
+      <div class="modal-body">
+
+        <div class="form-group">
+          <label for="task-title">Task Title <span class="required">*</span></label>
+          <input type="text" id="task-title" class="form-input" placeholder="What needs to be done?" autocomplete="off" />
+        </div>
+
+        <div class="form-group">
+          <label for="task-notes">Notes</label>
+          <textarea id="task-notes" class="form-input form-textarea" placeholder="Add details, links, or context..."></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-category">Category</label>
+            <select id="task-category" class="form-input">
+              <option value="work">💼 Work</option>
+              <option value="personal">🏠 Personal</option>
+              <option value="shopping">🛒 Shopping</option>
+              <option value="health">💪 Health</option>
+              <option value="other">📌 Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="task-priority">Priority</label>
+            <select id="task-priority" class="form-input">
+              <option value="low">🟢 Low</option>
+              <option value="medium" selected>🟡 Medium</option>
+              <option value="high">🟠 High</option>
+              <option value="critical">🔴 Critical</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="task-due">Due Date &amp; Time</label>
+            <input type="datetime-local" id="task-due" class="form-input" />
+          </div>
+          <div class="form-group">
+            <label for="task-recurring">Recurring</label>
+            <select id="task-recurring" class="form-input">
+              <option value="none">None</option>
+              <option value="daily">🔁 Daily</option>
+              <option value="weekly">🔁 Weekly</option>
+              <option value="monthly">🔁 Monthly</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Sub-tasks -->
+        <div class="form-group">
+          <label>Sub-tasks</label>
+          <div class="subtask-input-row">
+            <input type="text" id="subtask-input" class="form-input" placeholder="Add a sub-task and press Enter..." autocomplete="off" />
+            <button class="btn-add-sub" id="add-subtask-btn" aria-label="Add sub-task" type="button">+</button>
+          </div>
+          <ul class="modal-subtask-list" id="modal-subtask-list" role="list"></ul>
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="modal-cancel" type="button">Cancel</button>
+        <button class="btn-primary" id="modal-save" type="button">Save Task</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ====== POMODORO MODAL ====== -->
+  <div class="modal-overlay" id="pomodoro-modal" hidden role="dialog" aria-modal="true" aria-labelledby="pomo-title">
+    <div class="modal glass-card pomo-modal">
+      <div class="modal-header">
+        <h2 id="pomo-title">🍅 Pomodoro Timer</h2>
+        <button class="modal-close" id="pomodoro-close" aria-label="Close timer">✕</button>
+      </div>
+      <div class="pomo-body">
+        <p class="pomo-task-name" id="pomo-task-name"></p>
+        <div class="pomo-ring-wrap">
+          <svg class="pomo-ring-svg" viewBox="0 0 200 200" aria-hidden="true">
+            <circle class="ring-track" cx="100" cy="100" r="85"/>
+            <circle class="ring-fill pomo-ring-fill" id="pomo-ring-fill" cx="100" cy="100" r="85"/>
+          </svg>
+          <div class="pomo-time" id="pomo-time" aria-live="polite" aria-label="Timer">25:00</div>
+        </div>
+        <div class="pomo-controls">
+          <button class="btn-pomo" id="pomo-start">▶ Start</button>
+          <button class="btn-pomo" id="pomo-pause">⏸ Pause</button>
+          <button class="btn-pomo" id="pomo-reset">↺ Reset</button>
+        </div>
+        <p class="pomo-sessions" id="pomo-sessions">Sessions completed: 0</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
