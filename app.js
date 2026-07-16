@@ -5,6 +5,10 @@
 
 'use strict';
 
+const SUPABASE_URL = 'https://prrkslwtfmttmaxemuql.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBycmtzbHd0Zm10dG1heGVtdXFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMTg2NjIsImV4cCI6MjA5OTc5NDY2Mn0.er9c7dUt5NbzY7KmKZ_qf_gkkVhbc0lgxLRahtXr928';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 /* ============================================================
    STATE
    ============================================================ */
@@ -100,25 +104,24 @@ const isSoon = (iso) => {
 };
 
 /* ============================================================
-   LOCAL STORAGE PERSISTENCE
+   SUPABASE PERSISTENCE
    ============================================================ */
-function saveData() {
+async function saveData() {
   if (!state.currentUser) return;
+  
+  // We save streak in local storage for simplicity, tasks go to supabase
   const u = state.currentUser;
-  localStorage.setItem(`tf_tasks_${u}`,  JSON.stringify(state.tasks));
   localStorage.setItem(`tf_streak_${u}`, JSON.stringify({
     streak: state.streak,
     lastStreakDate: state.lastStreakDate,
   }));
 }
 
-function loadData() {
+async function loadData() {
   if (!state.currentUser) return;
   const u = state.currentUser;
+  
   try {
-    const tasks = localStorage.getItem(`tf_tasks_${u}`);
-    state.tasks = tasks ? JSON.parse(tasks) : [];
-
     const s = localStorage.getItem(`tf_streak_${u}`);
     if (s) {
       const { streak, lastStreakDate } = JSON.parse(s);
@@ -128,7 +131,27 @@ function loadData() {
       state.streak = 0;
       state.lastStreakDate = null;
     }
-  } catch {
+    
+    // Fetch from Supabase
+    const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    
+    state.tasks = data.map(t => ({
+      id: t.id,
+      title: t.title,
+      notes: t.notes,
+      category: t.category,
+      priority: t.priority,
+      due: t.due,
+      recurring: t.recurring,
+      subtasks: t.subtasks || [],
+      completed: t.completed,
+      completedAt: t.completed_at,
+      createdAt: t.created_at
+    }));
+    
+  } catch (err) {
+    console.error("Error loading tasks", err);
     state.tasks = [];
   }
 }
@@ -400,11 +423,10 @@ function bindCardEvents() {
 }
 
 /* ============================================================
-   TASK CRUD
+   TASK CRUD (SUPABASE)
    ============================================================ */
-function createTask(data) {
+async function createTask(data) {
   const task = {
-    id:          uid(),
     title:       data.title.trim(),
     notes:       (data.notes || '').trim(),
     category:    data.category  || 'other',
@@ -413,65 +435,121 @@ function createTask(data) {
     recurring:   data.recurring || 'none',
     subtasks:    data.subtasks  || [],
     completed:   false,
-    completedAt: null,
-    createdAt:   new Date().toISOString(),
+    completed_at: null,
+    user_id:     state.currentUser // Using UUID from auth
   };
-  state.tasks.unshift(task);
-  saveData();
+  
+  const { data: insertedData, error } = await supabase.from('tasks').insert([task]).select();
+  
+  if (error) {
+    showToast('Error creating task', 'error', '⚠️');
+    return;
+  }
+  
+  const dbTask = insertedData[0];
+  state.tasks.unshift({
+    id: dbTask.id,
+    title: dbTask.title,
+    notes: dbTask.notes,
+    category: dbTask.category,
+    priority: dbTask.priority,
+    due: dbTask.due,
+    recurring: dbTask.recurring,
+    subtasks: dbTask.subtasks,
+    completed: dbTask.completed,
+    completedAt: dbTask.completed_at,
+    createdAt: dbTask.created_at
+  });
+  
+  await saveData();
   render();
   showToast('Task added!', 'success', '✅');
 }
 
-function updateTask(id, data) {
+async function updateTask(id, data) {
   const idx = state.tasks.findIndex(t => t.id === id);
   if (idx === -1) return;
+  
+  const updatePayload = {
+    title: data.title,
+    notes: data.notes,
+    category: data.category,
+    priority: data.priority,
+    due: data.due,
+    recurring: data.recurring,
+    subtasks: data.subtasks
+  };
+
+  const { error } = await supabase.from('tasks').update(updatePayload).eq('id', id);
+  
+  if (error) {
+    showToast('Error updating task', 'error', '⚠️');
+    return;
+  }
+
   state.tasks[idx] = { ...state.tasks[idx], ...data };
-  saveData();
+  await saveData();
   render();
   showToast('Task updated!', 'info', '✏️');
 }
 
-function deleteTask(id) {
+async function deleteTask(id) {
   const card = document.querySelector(`.task-card[data-id="${CSS.escape(id)}"]`);
+  
+  const finishDelete = async () => {
+    state.tasks = state.tasks.filter(t => t.id !== id);
+    await supabase.from('tasks').delete().eq('id', id);
+    await saveData();
+    render();
+    showToast('Task deleted', 'error', '🗑️');
+  };
+  
   if (card) {
     card.classList.add('deleting');
-    card.addEventListener('animationend', () => {
-      state.tasks = state.tasks.filter(t => t.id !== id);
-      saveData();
-      render();
-    }, { once: true });
+    card.addEventListener('animationend', finishDelete, { once: true });
   } else {
-    state.tasks = state.tasks.filter(t => t.id !== id);
-    saveData();
-    render();
+    finishDelete();
   }
-  showToast('Task deleted', 'error', '🗑️');
 }
 
-function toggleTask(id) {
+async function toggleTask(id) {
   const task = state.tasks.find(t => t.id === id);
   if (!task) return;
+  
   task.completed   = !task.completed;
   task.completedAt = task.completed ? new Date().toISOString() : null;
-  saveData();
+  
+  const { error } = await supabase.from('tasks').update({
+    completed: task.completed,
+    completed_at: task.completedAt
+  }).eq('id', id);
+  
+  await saveData();
   render();
   if (task.completed)
     showToast(`"${task.title.slice(0, 28)}…" done!`, 'success', '🎉');
 }
 
-function toggleSubtask(taskId, idx) {
+async function toggleSubtask(taskId, idx) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task?.subtasks[idx]) return;
+  
   task.subtasks[idx].done = !task.subtasks[idx].done;
-  saveData();
+  
+  await supabase.from('tasks').update({ subtasks: task.subtasks }).eq('id', taskId);
+  
+  await saveData();
   render();
 }
 
-function deleteSubtask(taskId, idx) {
+async function deleteSubtask(taskId, idx) {
   const task = state.tasks.find(t => t.id === taskId);
   if (!task) return;
+  
   task.subtasks.splice(idx, 1);
-  saveData();
+  await supabase.from('tasks').update({ subtasks: task.subtasks }).eq('id', taskId);
+  
+  await saveData();
   render();
 }
 
@@ -752,29 +830,8 @@ function showConfetti() {
    EXPORT
    ============================================================ */
 /* ============================================================
-   AUTH — User Management
-   Passwords are SHA-256 hashed via the Web Crypto API.
-   This is a local-only app; not intended for production auth.
+   AUTH — Supabase User Management
    ============================================================ */
-
-/** SHA-256 hash a string using Web Crypto API (async) */
-async function hashPassword(pw) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
-  return Array.from(new Uint8Array(buf))
-    .map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-function getUsers() {
-  try { return JSON.parse(localStorage.getItem('tf_users') || '[]'); }
-  catch { return []; }
-}
-function saveUsers(users) {
-  localStorage.setItem('tf_users', JSON.stringify(users));
-}
-
-function getSession()           { return localStorage.getItem('tf_session'); }
-function setSession(username)   { localStorage.setItem('tf_session', username); state.currentUser = username; }
-function clearSession()         { localStorage.removeItem('tf_session'); state.currentUser = null; }
 
 function showApp() {
   document.getElementById('auth-screen').style.display = 'none';
@@ -784,7 +841,6 @@ function showAuth() {
   document.getElementById('app-wrapper').style.display  = 'none';
   document.getElementById('auth-screen').style.display  = '';
 }
-
 function setAuthError(formId, msg) {
   const el = document.getElementById(formId + '-error');
   if (el) el.textContent = msg;
@@ -799,22 +855,25 @@ async function handleLogin(e) {
   if (!username || !password) {
     setAuthError('login', 'Please fill in all fields.'); return;
   }
+  
+  // Use email for supabase login (username + @taskflow.local)
+  const email = username.includes('@') ? username : `${username}@taskflow.local`;
 
-  const users = getUsers();
-  const user  = users.find(u => u.username.toLowerCase() === username.toLowerCase());
-  if (!user) { setAuthError('login', 'User not found. Please register first.'); return; }
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: email,
+    password: password,
+  });
 
-  const hash = await hashPassword(password);
-  if (hash !== user.passwordHash) { setAuthError('login', 'Incorrect password.'); return; }
+  if (error) { setAuthError('login', error.message); return; }
 
-  setSession(user.username);
-  loadData();
+  state.currentUser = data.user.id;
+  await loadData();
   refreshRecurring();
-  updateUserBadge();
+  updateUserBadge(username);
   showApp();
   render();
   startDeadlineChecker();
-  showToast(`Welcome back, ${user.username}! 👋`, 'success', '👋');
+  showToast(`Welcome back! 👋`, 'success', '👋');
 }
 
 async function handleRegister(e) {
@@ -827,13 +886,6 @@ async function handleRegister(e) {
   if (!username || !password || !confirm) {
     setAuthError('register', 'Please fill in all fields.'); return;
   }
-  if (username.length < 3) {
-    setAuthError('register', 'Username must be at least 3 characters.'); return;
-  }
-  // Reject usernames with special chars to avoid storage key issues
-  if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-    setAuthError('register', 'Username can only contain letters, numbers, and underscores.'); return;
-  }
   if (password.length < 6) {
     setAuthError('register', 'Password must be at least 6 characters.'); return;
   }
@@ -841,32 +893,32 @@ async function handleRegister(e) {
     setAuthError('register', 'Passwords do not match.'); return;
   }
 
-  const users = getUsers();
-  if (users.some(u => u.username.toLowerCase() === username.toLowerCase())) {
-    setAuthError('register', 'Username already taken.'); return;
-  }
+  const email = username.includes('@') ? username : `${username}@taskflow.local`;
 
-  const passwordHash = await hashPassword(password);
-  users.push({ username, passwordHash, createdAt: new Date().toISOString() });
-  saveUsers(users);
+  const { data, error } = await supabase.auth.signUp({
+    email: email,
+    password: password,
+  });
 
-  setSession(username);
+  if (error) { setAuthError('register', error.message); return; }
+
+  state.currentUser = data.user.id;
   state.tasks = []; state.streak = 0; state.lastStreakDate = null;
-  saveData();
-  updateUserBadge();
+  await saveData();
+  updateUserBadge(username);
   showApp();
   render();
   startDeadlineChecker();
-  showToast(`Account created! Welcome, ${username}! 🎉`, 'success', '🎉');
+  showToast(`Account created! Welcome! 🎉`, 'success', '🎉');
 }
 
-function handleLogout() {
-  clearSession();
+async function handleLogout() {
+  await supabase.auth.signOut();
+  state.currentUser = null;
   state.tasks = []; state.streak = 0; state.lastStreakDate = null;
   state._deadlineNotified = new Set();
   confettiDone = false;
   showAuth();
-  // Switch back to login tab
   document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
   document.querySelector('.auth-tab[data-tab="login"]').classList.add('active');
   document.getElementById('login-form').style.display    = '';
@@ -875,6 +927,12 @@ function handleLogout() {
   document.getElementById('login-password').value = '';
   setAuthError('login', '');
   showToast('Signed out. See you soon!', 'info', '👋');
+}
+
+function updateUserBadge(email) {
+  const name = email ? email.split('@')[0] : 'User';
+  document.getElementById('user-name').textContent   = name;
+  document.getElementById('user-avatar').textContent = name.charAt(0).toUpperCase();
 }
 
 function updateUserBadge() {
@@ -1280,14 +1338,16 @@ function startDeadlineChecker() {
   checkDeadlines();
 }
 
-function init() {
+async function init() {
   initTheme();
-  const session = getSession();
-  if (session) {
-    state.currentUser = session;
-    loadData();
+  
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (session && session.user) {
+    state.currentUser = session.user.id;
+    await loadData();
     refreshRecurring();
-    updateUserBadge();
+    updateUserBadge(session.user.email);
     showApp();
     render();
     startDeadlineChecker();
