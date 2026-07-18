@@ -7,10 +7,10 @@
 
 const SUPABASE_URL = 'https://prrkslwtfmttmaxemuql.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBycmtzbHd0Zm10dG1heGVtdXFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMTg2NjIsImV4cCI6MjA5OTc5NDY2Mn0.er9c7dUt5NbzY7KmKZ_qf_gkkVhbc0lgxLRahtXr928';
-let supabase = null;
+let dbClient = null;
 try {
   if (window.supabase) {
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    dbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   } else {
     console.warn("Supabase CDN failed to load.");
   }
@@ -142,7 +142,7 @@ async function loadData() {
     }
     
     // Fetch from Supabase
-    const { data, error } = await supabase.from('tasks').select('*').order('created_at', { ascending: false });
+    const { data, error } = await dbClient.from('tasks').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     
     state.tasks = data.map(t => ({
@@ -448,7 +448,7 @@ async function createTask(data) {
     user_id:     state.currentUser // Using UUID from auth
   };
   
-  const { data: insertedData, error } = await supabase.from('tasks').insert([task]).select();
+  const { data: insertedData, error } = await dbClient.from('tasks').insert([task]).select();
   
   if (error) {
     showToast('Error creating task', 'error', '⚠️');
@@ -489,7 +489,7 @@ async function updateTask(id, data) {
     subtasks: data.subtasks
   };
 
-  const { error } = await supabase.from('tasks').update(updatePayload).eq('id', id);
+  const { error } = await dbClient.from('tasks').update(updatePayload).eq('id', id);
   
   if (error) {
     showToast('Error updating task', 'error', '⚠️');
@@ -507,7 +507,7 @@ async function deleteTask(id) {
   
   const finishDelete = async () => {
     state.tasks = state.tasks.filter(t => t.id !== id);
-    await supabase.from('tasks').delete().eq('id', id);
+    await dbClient.from('tasks').delete().eq('id', id);
     await saveData();
     render();
     showToast('Task deleted', 'error', '🗑️');
@@ -528,7 +528,7 @@ async function toggleTask(id) {
   task.completed   = !task.completed;
   task.completedAt = task.completed ? new Date().toISOString() : null;
   
-  const { error } = await supabase.from('tasks').update({
+  const { error } = await dbClient.from('tasks').update({
     completed: task.completed,
     completed_at: task.completedAt
   }).eq('id', id);
@@ -545,7 +545,7 @@ async function toggleSubtask(taskId, idx) {
   
   task.subtasks[idx].done = !task.subtasks[idx].done;
   
-  await supabase.from('tasks').update({ subtasks: task.subtasks }).eq('id', taskId);
+  await dbClient.from('tasks').update({ subtasks: task.subtasks }).eq('id', taskId);
   
   await saveData();
   render();
@@ -556,7 +556,7 @@ async function deleteSubtask(taskId, idx) {
   if (!task) return;
   
   task.subtasks.splice(idx, 1);
-  await supabase.from('tasks').update({ subtasks: task.subtasks }).eq('id', taskId);
+  await dbClient.from('tasks').update({ subtasks: task.subtasks }).eq('id', taskId);
   
   await saveData();
   render();
@@ -865,7 +865,7 @@ async function handleLogin(e) {
     setAuthError('login', 'Please fill in all fields.'); return;
   }
   
-  if (!supabase) {
+  if (!dbClient) {
     setAuthError('login', 'Supabase backend failed to load. Check your internet or adblocker.');
     return;
   }
@@ -873,7 +873,7 @@ async function handleLogin(e) {
   // Use email for supabase login (username + @taskflow.com)
   const email = username.includes('@') ? username : `${username}@taskflow.com`;
 
-  const { data, error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await dbClient.auth.signInWithPassword({
     email: email,
     password: password,
   });
@@ -909,7 +909,7 @@ async function handleRegister(e) {
 
   const email = username.includes('@') ? username : `${username}@taskflow.com`;
 
-  const { data, error } = await supabase.auth.signUp({
+  const { data, error } = await dbClient.auth.signUp({
     email: email,
     password: password,
   });
@@ -940,7 +940,7 @@ async function handleRegister(e) {
 }
 
 async function handleLogout() {
-  await supabase.auth.signOut();
+  await dbClient.auth.signOut();
   state.currentUser = null;
   state.tasks = []; state.streak = 0; state.lastStreakDate = null;
   state._deadlineNotified = new Set();
@@ -963,13 +963,13 @@ function updateUserBadge(email) {
 
 /* ---- Auth form toggles (Event Delegation) ---- */
 document.addEventListener('click', (e) => {
-  if (e.target && e.target.id === 'go-to-register') {
+  if (e.target && e.target.closest('#go-to-register')) {
     e.preventDefault();
     document.getElementById('login-form').style.display = 'none';
     document.getElementById('register-form').style.display = '';
     setAuthError('login', '');
   }
-  if (e.target && e.target.id === 'go-to-login') {
+  if (e.target && e.target.closest('#go-to-login')) {
     e.preventDefault();
     document.getElementById('register-form').style.display = 'none';
     document.getElementById('login-form').style.display = '';
@@ -1363,14 +1363,14 @@ function startDeadlineChecker() {
 async function init() {
   initTheme();
   
-  if (!supabase) {
+  if (!dbClient) {
     console.error("Supabase not available");
     showAuth();
     return;
   }
   
   try {
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await dbClient.auth.getSession();
   
   if (session && session.user) {
     state.currentUser = session.user.id;
