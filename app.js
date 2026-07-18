@@ -946,8 +946,6 @@ async function handleLogout() {
   state._deadlineNotified = new Set();
   confettiDone = false;
   showAuth();
-  document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector('.auth-tab[data-tab="login"]').classList.add('active');
   document.getElementById('login-form').style.display    = '';
   document.getElementById('register-form').style.display = 'none';
   document.getElementById('login-username').value = '';
@@ -963,18 +961,19 @@ function updateUserBadge(email) {
 }
 
 
-/* ---- Auth tab switching ---- */
-document.querySelectorAll('.auth-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.auth-tab').forEach(t => {
-      t.classList.remove('active'); t.setAttribute('aria-selected', 'false');
-    });
-    tab.classList.add('active'); tab.setAttribute('aria-selected', 'true');
-    const target = tab.dataset.tab;
-    document.getElementById('login-form').style.display    = target === 'login'    ? '' : 'none';
-    document.getElementById('register-form').style.display = target === 'register' ? '' : 'none';
-    setAuthError('login', ''); setAuthError('register', '');
-  });
+/* ---- Auth form toggles ---- */
+document.getElementById('go-to-register').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('login-form').style.display = 'none';
+  document.getElementById('register-form').style.display = '';
+  setAuthError('login', '');
+});
+
+document.getElementById('go-to-login').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.getElementById('register-form').style.display = 'none';
+  document.getElementById('login-form').style.display = '';
+  setAuthError('register', '');
 });
 
 /* ---- Password visibility toggles ---- */

@@ -29,11 +29,7 @@
       </div>
       <p class="auth-tagline">Your personal productivity hub</p>
 
-      <!-- Tab switcher -->
-      <div class="auth-tabs" role="tablist">
-        <button class="auth-tab active" data-tab="login" role="tab" aria-selected="true">Sign In</button>
-        <button class="auth-tab" data-tab="register" role="tab" aria-selected="false">Register</button>
-      </div>
+      
 
       <!-- Login Form -->
       <form class="auth-form" id="login-form" novalidate>
@@ -53,6 +49,7 @@
         <p class="auth-error" id="login-error" role="alert"></p>
         <button type="submit" class="btn-primary auth-submit">Sign In</button>
         <p class="auth-hint">Demo: register a new account to get started.</p>
+        <div class="auth-toggle-text">Don't have an account? <a href="#" id="go-to-register">Sign up here</a></div>
       </form>
 
       <!-- Register Form -->
@@ -80,6 +77,7 @@
         </div>
         <p class="auth-error" id="register-error" role="alert"></p>
         <button type="submit" class="btn-primary auth-submit">Create Account</button>
+        <div class="auth-toggle-text">Already have an account? <a href="#" id="go-to-login">Sign in</a></div>
       </form>
 
     </div>
@@ -374,6 +372,6 @@
 
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=1784384185"></script>
+  <script src="app.js?v=1784386927"></script>
 </body>
 </html>
