@@ -7,7 +7,16 @@
 
 const SUPABASE_URL = 'https://prrkslwtfmttmaxemuql.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBycmtzbHd0Zm10dG1heGVtdXFsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQyMTg2NjIsImV4cCI6MjA5OTc5NDY2Mn0.er9c7dUt5NbzY7KmKZ_qf_gkkVhbc0lgxLRahtXr928';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let supabase = null;
+try {
+  if (window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  } else {
+    console.warn("Supabase CDN failed to load.");
+  }
+} catch(e) {
+  console.error("Supabase init error:", e);
+}
 
 /* ============================================================
    STATE
@@ -856,6 +865,11 @@ async function handleLogin(e) {
     setAuthError('login', 'Please fill in all fields.'); return;
   }
   
+  if (!supabase) {
+    setAuthError('login', 'Supabase backend failed to load. Check your internet or adblocker.');
+    return;
+  }
+  
   // Use email for supabase login (username + @taskflow.local)
   const email = username.includes('@') ? username : `${username}@taskflow.local`;
 
@@ -1344,7 +1358,14 @@ function startDeadlineChecker() {
 async function init() {
   initTheme();
   
-  const { data: { session } } = await supabase.auth.getSession();
+  if (!supabase) {
+    console.error("Supabase not available");
+    showAuth();
+    return;
+  }
+  
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
   
   if (session && session.user) {
     state.currentUser = session.user.id;
@@ -1358,6 +1379,10 @@ async function init() {
   } else {
     showAuth();
     requestAnimationFrame(() => document.getElementById('login-username')?.focus());
+  }
+  } catch(e) {
+    console.error("Session error:", e);
+    showAuth();
   }
 }
 
