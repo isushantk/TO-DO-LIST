@@ -961,19 +961,20 @@ function updateUserBadge(email) {
 }
 
 
-/* ---- Auth form toggles ---- */
-document.getElementById('go-to-register').addEventListener('click', (e) => {
-  e.preventDefault();
-  document.getElementById('login-form').style.display = 'none';
-  document.getElementById('register-form').style.display = '';
-  setAuthError('login', '');
-});
-
-document.getElementById('go-to-login').addEventListener('click', (e) => {
-  e.preventDefault();
-  document.getElementById('register-form').style.display = 'none';
-  document.getElementById('login-form').style.display = '';
-  setAuthError('register', '');
+/* ---- Auth form toggles (Event Delegation) ---- */
+document.addEventListener('click', (e) => {
+  if (e.target && e.target.id === 'go-to-register') {
+    e.preventDefault();
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('register-form').style.display = '';
+    setAuthError('login', '');
+  }
+  if (e.target && e.target.id === 'go-to-login') {
+    e.preventDefault();
+    document.getElementById('register-form').style.display = 'none';
+    document.getElementById('login-form').style.display = '';
+    setAuthError('register', '');
+  }
 });
 
 /* ---- Password visibility toggles ---- */
