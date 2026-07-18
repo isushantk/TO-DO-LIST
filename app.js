@@ -900,7 +900,15 @@ async function handleRegister(e) {
     password: password,
   });
 
-  if (error) { setAuthError('register', error.message); return; }
+  if (error) { 
+    setAuthError('register', error.message); 
+    return; 
+  }
+  
+  if (!data.user) {
+    setAuthError('register', 'Could not create account. User might already exist.');
+    return;
+  }
 
   state.currentUser = data.user.id;
   state.tasks = []; state.streak = 0; state.lastStreakDate = null;
@@ -935,11 +943,6 @@ function updateUserBadge(email) {
   document.getElementById('user-avatar').textContent = name.charAt(0).toUpperCase();
 }
 
-function updateUserBadge() {
-  const name = state.currentUser || 'User';
-  document.getElementById('user-name').textContent   = name;
-  document.getElementById('user-avatar').textContent = name.charAt(0).toUpperCase();
-}
 
 /* ---- Auth tab switching ---- */
 document.querySelectorAll('.auth-tab').forEach(tab => {
