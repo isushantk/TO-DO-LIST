@@ -870,8 +870,8 @@ async function handleLogin(e) {
     return;
   }
   
-  // Use email for supabase login (username + @taskflow.local)
-  const email = username.includes('@') ? username : `${username}@taskflow.local`;
+  // Use email for supabase login (username + @taskflow.com)
+  const email = username.includes('@') ? username : `${username}@taskflow.com`;
 
   const { data, error } = await supabase.auth.signInWithPassword({
     email: email,
@@ -907,7 +907,7 @@ async function handleRegister(e) {
     setAuthError('register', 'Passwords do not match.'); return;
   }
 
-  const email = username.includes('@') ? username : `${username}@taskflow.local`;
+  const email = username.includes('@') ? username : `${username}@taskflow.com`;
 
   const { data, error } = await supabase.auth.signUp({
     email: email,
@@ -921,6 +921,11 @@ async function handleRegister(e) {
   
   if (!data.user) {
     setAuthError('register', 'Could not create account. User might already exist.');
+    return;
+  }
+  
+  if (!data.session) {
+    setAuthError('register', 'Account created! Please check your email to confirm your account. (If you used a fake email, you MUST disable Email Confirmations in your Supabase Dashboard).');
     return;
   }
 
