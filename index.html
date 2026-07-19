@@ -370,8 +370,42 @@
     </div>
   </div>
 
+  <!-- Chatbot UI -->
+  <div class="chatbot-wrapper" id="chatbot-wrapper">
+    <button class="chatbot-toggle" id="chatbot-toggle" aria-label="Open AI Assistant">
+      <span class="chatbot-icon">✨</span>
+    </button>
+    <div class="chatbot-window glass-card" id="chatbot-window" style="display: none;">
+      <div class="chatbot-header">
+        <span class="chatbot-title">AI Assistant</span>
+        <div class="chatbot-actions">
+          <button class="chatbot-btn" id="chatbot-settings-btn" title="API Settings">⚙️</button>
+          <button class="chatbot-btn" id="chatbot-close-btn" title="Close">×</button>
+        </div>
+      </div>
+      
+      <div class="chatbot-settings" id="chatbot-settings" style="display: none;">
+        <label for="gemini-api-key" style="font-size: 0.85rem; color: var(--text-2);">Gemini API Key</label>
+        <input type="password" id="gemini-api-key" class="form-input" placeholder="Paste your API key here" style="margin-top: 0.5rem; margin-bottom: 0.5rem;" />
+        <p style="font-size: 0.75rem; color: var(--text-3); margin-bottom: 0.5rem;">
+          Get a free key from <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent);">Google AI Studio</a>. It is saved locally in your browser.
+        </p>
+        <button class="btn-primary" id="chatbot-save-key" style="width: 100%; padding: 0.4rem; font-size: 0.85rem;">Save Key</button>
+      </div>
+
+      <div class="chatbot-messages" id="chatbot-messages">
+        <div class="chat-msg ai">Hello! I am your AI assistant. Tell me to add or remove tasks in English or Hindi! (e.g. "Kal subah 9 baje meeting add karo")</div>
+      </div>
+      
+      <div class="chatbot-input-area">
+        <input type="text" id="chatbot-input" class="form-input" placeholder="Type a command..." autocomplete="off" />
+        <button class="btn-primary chatbot-send" id="chatbot-send">→</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app.js?v=1784388971"></script>
+  <script src="app.js?v=1784498747"></script>
 </body>
 </html>

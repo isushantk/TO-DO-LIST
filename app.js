@@ -1392,3 +1392,145 @@ async function init() {
 }
 
 init();
+
+/* ============================================================
+   AI CHATBOT WIDGET
+   ============================================================ */
+const chatToggle = document.getElementById('chatbot-toggle');
+const chatWindow = document.getElementById('chatbot-window');
+const chatClose = document.getElementById('chatbot-close-btn');
+const chatSettingsBtn = document.getElementById('chatbot-settings-btn');
+const chatSettings = document.getElementById('chatbot-settings');
+const chatKeyInput = document.getElementById('gemini-api-key');
+const chatSaveKey = document.getElementById('chatbot-save-key');
+const chatMessages = document.getElementById('chatbot-messages');
+const chatInput = document.getElementById('chatbot-input');
+const chatSend = document.getElementById('chatbot-send');
+
+let GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
+if (GEMINI_API_KEY) {
+  chatKeyInput.value = GEMINI_API_KEY;
+}
+
+function appendChatMsg(text, sender) {
+  const div = document.createElement('div');
+  div.className = `chat-msg ${sender}`;
+  div.textContent = text;
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+chatToggle?.addEventListener('click', () => {
+  chatWindow.style.display = chatWindow.style.display === 'none' ? 'flex' : 'none';
+  if (chatWindow.style.display === 'flex') chatInput.focus();
+});
+
+chatClose?.addEventListener('click', () => {
+  chatWindow.style.display = 'none';
+});
+
+chatSettingsBtn?.addEventListener('click', () => {
+  chatSettings.style.display = chatSettings.style.display === 'none' ? 'block' : 'none';
+});
+
+chatSaveKey?.addEventListener('click', () => {
+  GEMINI_API_KEY = chatKeyInput.value.trim();
+  localStorage.setItem('gemini_api_key', GEMINI_API_KEY);
+  chatSettings.style.display = 'none';
+  appendChatMsg('API Key saved successfully.', 'system');
+});
+
+async function sendToGemini(userText) {
+  if (!GEMINI_API_KEY) {
+    appendChatMsg('Please set your Gemini API key in settings first.', 'system');
+    chatSettings.style.display = 'block';
+    return;
+  }
+
+  appendChatMsg(userText, 'user');
+  chatInput.value = '';
+  chatInput.disabled = true;
+  chatSend.disabled = true;
+  
+  appendChatMsg('Thinking...', 'system');
+  
+  try {
+    const currentTasks = state.tasks.map(t => ({ id: t.id, title: t.title, due: t.due })).slice(0, 20); // Only send context of up to 20 tasks
+    
+    const systemPrompt = `You are an AI task manager. The user will ask to add or remove a task in English or Hindi. 
+    Current tasks context (JSON): ${JSON.stringify(currentTasks)}
+    
+    You MUST respond with a valid JSON array of action objects. Do NOT include markdown blocks like \`\`\`json.
+    
+    Possible actions:
+    1. To add a task: {"action": "add", "title": "Task title (English)", "due": "YYYY-MM-DDTHH:MM:SS" (optional), "reply": "A friendly confirmation reply in the language the user used."}
+    2. To remove a task: {"action": "remove", "id": "The exact task ID from the context", "reply": "A friendly confirmation reply in the user's language."}
+    
+    If the user's request is ambiguous or you can't figure out which task to delete, return: {"action": "error", "reply": "Explanation of what went wrong."}
+    
+    Always format output as a JSON array (e.g. [{...}]).`;
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ parts: [{ text: userText }] }],
+        generationConfig: { temperature: 0.1 }
+      })
+    });
+    
+    const data = await response.json();
+    if (data.error) throw new Error(data.error.message);
+    
+    const textResponse = data.candidates[0].content.parts[0].text.trim();
+    // Remove markdown code blocks if the AI accidentally adds them
+    const cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+    const actions = JSON.parse(cleanJson);
+    
+    // Remove the "Thinking..." message
+    chatMessages.removeChild(chatMessages.lastChild);
+    
+    for (const action of actions) {
+      if (action.action === 'add') {
+        const newTask = {
+          title: action.title,
+          notes: '', category: 'Work', priority: 'medium', recurring: 'none', subtasks: [],
+          due: action.due || null
+        };
+        createTask(newTask);
+        appendChatMsg(action.reply || `Task added: ${action.title}`, 'ai');
+      } else if (action.action === 'remove') {
+        if (action.id) {
+          deleteTask(action.id);
+          appendChatMsg(action.reply || 'Task removed successfully.', 'ai');
+        } else {
+          appendChatMsg('Error: Could not find the task ID to remove.', 'ai');
+        }
+      } else if (action.action === 'error') {
+        appendChatMsg(action.reply || "I couldn't understand that.", 'ai');
+      }
+    }
+    
+  } catch (err) {
+    console.error("Gemini Error:", err);
+    chatMessages.removeChild(chatMessages.lastChild);
+    appendChatMsg(`Error connecting to AI: ${err.message}`, 'system');
+  } finally {
+    chatInput.disabled = false;
+    chatSend.disabled = false;
+    chatInput.focus();
+  }
+}
+
+chatSend?.addEventListener('click', () => {
+  const text = chatInput.value.trim();
+  if (text) sendToGemini(text);
+});
+
+chatInput?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    const text = chatInput.value.trim();
+    if (text) sendToGemini(text);
+  }
+});
