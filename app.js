@@ -1472,24 +1472,33 @@ async function sendToGemini(userText) {
     
     let targetModel = localStorage.getItem('cached_gemini_model');
     
+    // Clear bad cached model from previous bug
+    if (targetModel && targetModel.includes('2.5')) {
+      targetModel = null;
+      localStorage.removeItem('cached_gemini_model');
+    }
+    
     if (!targetModel) {
       const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
       const modelsData = await modelsRes.json();
       if (modelsData.error) throw new Error("API Error: " + modelsData.error.message);
       
       const availableModels = modelsData.models || [];
-      const preferred = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro', 'models/gemini-pro'];
+      const preferred = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro'];
       
       for (const p of preferred) {
-        if (availableModels.find(m => m.name === p && (m.supportedGenerationMethods || []).includes('generateContent'))) {
-          targetModel = p.split('/')[1];
+        const found = availableModels.find(m => m.name.includes(p) && !m.name.includes('vision') && (m.supportedGenerationMethods || []).includes('generateContent'));
+        if (found) {
+          targetModel = found.name.split('/')[1];
           break;
         }
       }
+      
       if (!targetModel) {
-        const fallback = availableModels.find(m => m.name.startsWith('models/gemini') && (m.supportedGenerationMethods || []).includes('generateContent'));
+        const fallback = availableModels.find(m => m.name.startsWith('models/gemini') && !m.name.includes('2.5') && !m.name.includes('vision') && (m.supportedGenerationMethods || []).includes('generateContent'));
         if (fallback) targetModel = fallback.name.split('/')[1];
       }
+      
       if (!targetModel) {
         throw new Error("No compatible models found. Available: " + availableModels.map(m=>m.name).join(', '));
       }
