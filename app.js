@@ -1470,12 +1470,37 @@ async function sendToGemini(userText) {
     
     Always format output as a JSON array (e.g. [{...}]).`;
     
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}`, {
+    let targetModel = localStorage.getItem('cached_gemini_model');
+    
+    if (!targetModel) {
+      const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+      const modelsData = await modelsRes.json();
+      if (modelsData.error) throw new Error("API Error: " + modelsData.error.message);
+      
+      const availableModels = modelsData.models || [];
+      const preferred = ['models/gemini-1.5-flash', 'models/gemini-1.5-pro', 'models/gemini-1.0-pro', 'models/gemini-pro'];
+      
+      for (const p of preferred) {
+        if (availableModels.find(m => m.name === p && (m.supportedGenerationMethods || []).includes('generateContent'))) {
+          targetModel = p.split('/')[1];
+          break;
+        }
+      }
+      if (!targetModel) {
+        const fallback = availableModels.find(m => m.name.startsWith('models/gemini') && (m.supportedGenerationMethods || []).includes('generateContent'));
+        if (fallback) targetModel = fallback.name.split('/')[1];
+      }
+      if (!targetModel) {
+        throw new Error("No compatible models found. Available: " + availableModels.map(m=>m.name).join(', '));
+      }
+      localStorage.setItem('cached_gemini_model', targetModel);
+    }
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${GEMINI_API_KEY}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ parts: [{ text: userText }] }],
+        contents: [{ parts: [{ text: systemPrompt + "\n\nUser Request: " + userText }] }],
         generationConfig: { temperature: 0.1 }
       })
     });
