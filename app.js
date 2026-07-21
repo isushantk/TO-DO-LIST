@@ -1401,15 +1401,15 @@ const chatWindow = document.getElementById('chatbot-window');
 const chatClose = document.getElementById('chatbot-close-btn');
 const chatSettingsBtn = document.getElementById('chatbot-settings-btn');
 const chatSettings = document.getElementById('chatbot-settings');
-const chatKeyInput = document.getElementById('gemini-api-key');
+const chatKeyInput = document.getElementById('groq-api-key');
 const chatSaveKey = document.getElementById('chatbot-save-key');
 const chatMessages = document.getElementById('chatbot-messages');
 const chatInput = document.getElementById('chatbot-input');
 const chatSend = document.getElementById('chatbot-send');
 
-let GEMINI_API_KEY = localStorage.getItem('gemini_api_key') || '';
-if (GEMINI_API_KEY) {
-  chatKeyInput.value = GEMINI_API_KEY;
+let GROQ_API_KEY = localStorage.getItem('groq_api_key') || '';
+if (GROQ_API_KEY) {
+  chatKeyInput.value = GROQ_API_KEY;
 }
 
 function appendChatMsg(text, sender) {
@@ -1434,15 +1434,15 @@ chatSettingsBtn?.addEventListener('click', () => {
 });
 
 chatSaveKey?.addEventListener('click', () => {
-  GEMINI_API_KEY = chatKeyInput.value.trim();
-  localStorage.setItem('gemini_api_key', GEMINI_API_KEY);
+  GROQ_API_KEY = chatKeyInput.value.trim();
+  localStorage.setItem('groq_api_key', GROQ_API_KEY);
   chatSettings.style.display = 'none';
-  appendChatMsg('API Key saved successfully.', 'system');
+  appendChatMsg('Groq API Key saved successfully.', 'system');
 });
 
-async function sendToGemini(userText) {
-  if (!GEMINI_API_KEY) {
-    appendChatMsg('Please set your Gemini API key in settings first.', 'system');
+async function sendToGroq(userText) {
+  if (!GROQ_API_KEY) {
+    appendChatMsg('Please set your Groq API key in settings first.', 'system');
     chatSettings.style.display = 'block';
     return;
   }
@@ -1470,41 +1470,28 @@ async function sendToGemini(userText) {
     
     Always format output as a JSON array (e.g. [{...}]).`;
     
-    const modelsToTry = ['gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-pro'];
-    let successfulData = null;
-    let lastError = null;
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${GROQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: 'llama3-8b-8192',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userText }
+        ],
+        temperature: 0.1
+      })
+    });
     
-    for (const model of modelsToTry) {
-      try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: systemPrompt + "\n\nUser Request: " + userText }] }],
-            generationConfig: { temperature: 0.1 }
-          })
-        });
-        
-        const data = await response.json();
-        if (data.error) {
-          throw new Error(data.error.message);
-        }
-        
-        successfulData = data;
-        break; // Stop trying if successful
-      } catch (err) {
-        lastError = err;
-        console.warn(`Model ${model} failed:`, err.message);
-      }
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error.message);
     }
     
-    if (!successfulData) {
-      throw new Error(`All fallback models failed. Last error: ${lastError.message}`);
-    }
-    
-    const data = successfulData;
-    
-    const textResponse = data.candidates[0].content.parts[0].text.trim();
+    const textResponse = data.choices[0].message.content.trim();
     // Remove markdown code blocks if the AI accidentally adds them
     const cleanJson = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
     const actions = JSON.parse(cleanJson);
@@ -1534,7 +1521,7 @@ async function sendToGemini(userText) {
     }
     
   } catch (err) {
-    console.error("Gemini Error:", err);
+    console.error("Groq Error:", err);
     chatMessages.removeChild(chatMessages.lastChild);
     appendChatMsg(`Error connecting to AI: ${err.message}`, 'system');
   } finally {
@@ -1546,12 +1533,12 @@ async function sendToGemini(userText) {
 
 chatSend?.addEventListener('click', () => {
   const text = chatInput.value.trim();
-  if (text) sendToGemini(text);
+  if (text) sendToGroq(text);
 });
 
 chatInput?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     const text = chatInput.value.trim();
-    if (text) sendToGemini(text);
+    if (text) sendToGroq(text);
   }
 });
