@@ -1458,7 +1458,12 @@ async function sendToGroq(userText) {
   try {
     const currentTasks = state.tasks.map(t => ({ id: t.id, title: t.title, due: t.due })).slice(0, 20); // Only send context of up to 20 tasks
     
+    const now = new Date();
     const systemPrompt = `You are an AI task manager. The user will ask to add or remove a task in English or Hindi. 
+    
+    CRITICAL TIME CONTEXT: The current date and time right now is: ${now.toString()}. 
+    You MUST use this exact time as your reference point. For example, if today is Monday and the user says "tomorrow 3:30 pm", calculate the exact ISO timestamp for Tuesday at 15:30:00 in the local timezone.
+
     Current tasks context (JSON): ${JSON.stringify(currentTasks)}
     
     You MUST respond with a valid JSON array of action objects. Do NOT include markdown blocks like \`\`\`json.
