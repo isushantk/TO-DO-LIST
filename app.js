@@ -1472,8 +1472,8 @@ async function sendToGemini(userText) {
     
     let targetModel = localStorage.getItem('cached_gemini_model');
     
-    // Clear bad cached model from previous bug
-    if (targetModel && targetModel.includes('2.5')) {
+    // Clear any potentially bad cached model (including 2.5, 3.1)
+    if (targetModel && (targetModel.includes('2.5') || targetModel.includes('3.1'))) {
       targetModel = null;
       localStorage.removeItem('cached_gemini_model');
     }
@@ -1484,7 +1484,8 @@ async function sendToGemini(userText) {
       if (modelsData.error) throw new Error("API Error: " + modelsData.error.message);
       
       const availableModels = modelsData.models || [];
-      const preferred = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro'];
+      // List of all standard production models
+      const preferred = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro', 'gemini-1.5-flash-8b'];
       
       for (const p of preferred) {
         const found = availableModels.find(m => m.name.includes(p) && !m.name.includes('vision') && (m.supportedGenerationMethods || []).includes('generateContent'));
@@ -1495,12 +1496,10 @@ async function sendToGemini(userText) {
       }
       
       if (!targetModel) {
-        const fallback = availableModels.find(m => m.name.startsWith('models/gemini') && !m.name.includes('2.5') && !m.name.includes('vision') && (m.supportedGenerationMethods || []).includes('generateContent'));
-        if (fallback) targetModel = fallback.name.split('/')[1];
-      }
-      
-      if (!targetModel) {
-        throw new Error("No compatible models found. Available: " + availableModels.map(m=>m.name).join(', '));
+        // Instead of blindly falling back and hitting Quota limits on 3.1 preview models,
+        // let's print EXACTLY what this API key has access to so we can debug.
+        const modelNames = availableModels.map(m => m.name.replace('models/', '')).join(', ');
+        throw new Error("No standard models found for this API Key. Your key only has access to: [" + modelNames + "]. Please share this list.");
       }
       localStorage.setItem('cached_gemini_model', targetModel);
     }
