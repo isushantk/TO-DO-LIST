@@ -1470,26 +1470,44 @@ async function sendToGroq(userText) {
     
     Always format output as a JSON array (e.g. [{...}]).`;
     
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama3-8b-8192',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userText }
-        ],
-        temperature: 0.1
-      })
-    });
-    
-    const data = await response.json();
-    if (data.error) {
-      throw new Error(data.error.message);
+    const modelsToTry = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'llama-3.1-70b-versatile'];
+    let successfulData = null;
+    let lastError = null;
+
+    for (const model of modelsToTry) {
+      try {
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${GROQ_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userText }
+            ],
+            temperature: 0.1
+          })
+        });
+        
+        const data = await response.json();
+        if (data.error) throw new Error(data.error.message);
+        
+        successfulData = data;
+        break;
+      } catch (err) {
+        lastError = err;
+        console.warn(`Groq model ${model} failed:`, err.message);
+      }
     }
+    
+    if (!successfulData) {
+      throw new Error(`All Groq models failed. Last error: ${lastError.message}`);
+    }
+    
+    const data = successfulData;
     
     const textResponse = data.choices[0].message.content.trim();
     // Remove markdown code blocks if the AI accidentally adds them
