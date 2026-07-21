@@ -1406,6 +1406,7 @@ const chatSaveKey = document.getElementById('chatbot-save-key');
 const chatMessages = document.getElementById('chatbot-messages');
 const chatInput = document.getElementById('chatbot-input');
 const chatSend = document.getElementById('chatbot-send');
+const chatMic = document.getElementById('chatbot-mic');
 
 let GROQ_API_KEY = localStorage.getItem('groq_api_key') || '';
 if (GROQ_API_KEY) {
@@ -1560,3 +1561,54 @@ chatInput?.addEventListener('keydown', (e) => {
     if (text) sendToGroq(text);
   }
 });
+
+// --- Web Speech API (Voice Transcription) ---
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+if (SpeechRecognition && chatMic) {
+  const recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  // Use English/Hindi mixed recognition if possible, but English usually handles both fine
+  recognition.lang = 'en-IN'; 
+  recognition.interimResults = false;
+  
+  let isRecording = false;
+
+  chatMic.addEventListener('click', () => {
+    if (isRecording) {
+      recognition.stop();
+      return;
+    }
+    recognition.start();
+  });
+
+  recognition.onstart = () => {
+    isRecording = true;
+    chatMic.classList.add('recording');
+    chatInput.placeholder = "Listening...";
+  };
+
+  recognition.onresult = (event) => {
+    const transcript = event.results[0][0].transcript;
+    chatInput.value = transcript;
+    
+    // Automatically send it when they finish speaking
+    setTimeout(() => {
+      sendToGroq(transcript);
+    }, 500);
+  };
+
+  recognition.onerror = (event) => {
+    console.error("Speech recognition error", event.error);
+    isRecording = false;
+    chatMic.classList.remove('recording');
+    chatInput.placeholder = "Type a command...";
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    chatMic.classList.remove('recording');
+    chatInput.placeholder = "Type a command...";
+  };
+} else if (chatMic) {
+  chatMic.style.display = 'none'; // Hide if browser doesn't support it
+}

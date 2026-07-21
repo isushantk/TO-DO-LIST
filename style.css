@@ -1671,11 +1671,32 @@ body::before {
   gap: 0.5rem;
   background: var(--bg-card);
 }
-.chatbot-send {
+.chatbot-mic, .chatbot-send {
   width: 40px;
   padding: 0;
   display: flex; align-items: center; justify-content: center;
   border-radius: var(--radius-s);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.chatbot-mic {
+  background: var(--bg-body);
+  color: var(--text-1);
+  border: 1px solid var(--border);
+}
+.chatbot-mic:hover {
+  background: var(--bg-secondary);
+}
+.chatbot-mic.recording {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+  border-color: var(--danger);
+  animation: pulse 1.5s infinite;
+}
+.chatbot-send {
+  background: var(--primary);
+  color: white;
 }
 @media (max-width: 480px) {
   .chatbot-wrapper {
