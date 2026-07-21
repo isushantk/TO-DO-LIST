@@ -1470,51 +1470,39 @@ async function sendToGemini(userText) {
     
     Always format output as a JSON array (e.g. [{...}]).`;
     
-    let targetModel = localStorage.getItem('cached_gemini_model');
+    const modelsToTry = ['gemini-1.5-flash', 'gemini-1.0-pro', 'gemini-1.5-pro', 'gemini-pro'];
+    let successfulData = null;
+    let lastError = null;
     
-    // Clear any potentially bad cached model (including 2.5, 3.1)
-    if (targetModel && (targetModel.includes('2.5') || targetModel.includes('3.1'))) {
-      targetModel = null;
-      localStorage.removeItem('cached_gemini_model');
-    }
-    
-    if (!targetModel) {
-      const modelsRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
-      const modelsData = await modelsRes.json();
-      if (modelsData.error) throw new Error("API Error: " + modelsData.error.message);
-      
-      const availableModels = modelsData.models || [];
-      // List of all standard production models
-      const preferred = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro', 'gemini-pro', 'gemini-1.5-flash-8b'];
-      
-      for (const p of preferred) {
-        const found = availableModels.find(m => m.name.includes(p) && !m.name.includes('vision') && (m.supportedGenerationMethods || []).includes('generateContent'));
-        if (found) {
-          targetModel = found.name.split('/')[1];
-          break;
+    for (const model of modelsToTry) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: systemPrompt + "\n\nUser Request: " + userText }] }],
+            generationConfig: { temperature: 0.1 }
+          })
+        });
+        
+        const data = await response.json();
+        if (data.error) {
+          throw new Error(data.error.message);
         }
+        
+        successfulData = data;
+        break; // Stop trying if successful
+      } catch (err) {
+        lastError = err;
+        console.warn(`Model ${model} failed:`, err.message);
       }
-      
-      if (!targetModel) {
-        // Instead of blindly falling back and hitting Quota limits on 3.1 preview models,
-        // let's print EXACTLY what this API key has access to so we can debug.
-        const modelNames = availableModels.map(m => m.name.replace('models/', '')).join(', ');
-        throw new Error("No standard models found for this API Key. Your key only has access to: [" + modelNames + "]. Please share this list.");
-      }
-      localStorage.setItem('cached_gemini_model', targetModel);
     }
     
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: systemPrompt + "\n\nUser Request: " + userText }] }],
-        generationConfig: { temperature: 0.1 }
-      })
-    });
+    if (!successfulData) {
+      throw new Error(`All fallback models failed. Last error: ${lastError.message}`);
+    }
     
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
+    const data = successfulData;
     
     const textResponse = data.candidates[0].content.parts[0].text.trim();
     // Remove markdown code blocks if the AI accidentally adds them
